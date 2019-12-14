@@ -1,58 +1,36 @@
+use crate::intcode::{Program};
+
 #[aoc_generator(day2)]
-fn generator_input(input: &str) -> Vec<i32> {
+fn generator_input(input: &str) -> Vec<i64> {
     input
         .split(",")
-        .map(|a| a.parse::<i32>().unwrap())
+        .map(|a| a.parse::<i64>().unwrap())
         .collect()
 }
 
-#[derive(Clone)]
-pub struct Program {
-    data: Vec<i32>,
-    pointer: usize,
-}
-
-impl Program {
-    pub fn new(data: Vec<i32>) -> Self {
-        Program { data, pointer: 0 }
-    }
-
-    pub fn solve_for(&mut self, verb: i32, noun: i32) -> i32 {
-        self.data[1] = verb;
-        self.data[2] = noun;
-        while self.next() {}
-        self.data[0]
-    }
-
-    pub fn next(&mut self) -> bool {
-        let op_code = self.data[self.pointer];
-        let idx_a = self.data[self.pointer + 1] as usize;
-        let idx_b = self.data[self.pointer + 2] as usize;
-        let idx_c = self.data[self.pointer + 3] as usize;
-        let res = match op_code {
-            1 => {
-                let val = self.data[idx_a] + self.data[idx_b];
-                self.data[idx_c] = val;
-                true
-            }
-            2 => {
-                let val = self.data[idx_a] * self.data[idx_b];
-                self.data[idx_c] = val;
-                true
-            }
-            _ => false,
-        };
-
-        if res {
-            self.pointer += 4;
-        }
-
-        res
-    }
-}
-
 #[aoc(day2, part1)]
-fn part_one(input: &[i32]) -> i32 {
-    let mut program = Program::new(input.to_vec());
-    program.solve_for(12, 2)
+fn part_one(input: &Vec<i64>) -> i64 {
+    solve(input.to_vec(), 12, 2)
+}
+
+#[aoc(day2, part2)]
+fn part_two(input: &Vec<i64>) -> i64 {
+    for noun in 0..100 {
+        for verb in 0..100 {
+            if solve(input.to_vec(), noun, verb) == 19_690_720 {
+                return 100 * noun + verb;
+            }
+        }
+    }
+
+    0
+}
+
+fn solve(input: Vec<i64>, noun: i64, verb: i64) -> i64 {
+    let mut program = Program::new(input, vec![]);
+    program.data[1] = noun;
+    program.data[2] = verb;
+    program.execute();
+
+    program.data[0]
 }

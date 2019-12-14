@@ -1,6 +1,3 @@
-#![allow(warnings)]
-
-
 #[derive(Debug, Clone)]
 pub enum Parameter {
     Position(usize),
@@ -44,7 +41,7 @@ pub enum Action {
     Halt,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub data: Vec<i64>,
     pointer: usize,
@@ -66,15 +63,19 @@ impl Program {
         }
     }
 
-    pub fn halt_on_output(&mut self) -> &Self {
+    pub fn halt_on_output(&mut self) -> Self {
         self.halt_on_output = true;
-        self
+        self.clone()
     }
 
     pub fn read_input(&mut self) -> i64 {
         let value = self.input[self.input_pointer];
         self.input_pointer += 1;
         value
+    }
+
+    pub fn write_input(&mut self, value: i64) {
+        self.input.push(value);
     }
 
     pub fn read(&mut self) -> i64 {
@@ -216,11 +217,18 @@ impl Program {
         };
     }
 
-    pub fn execute(&mut self) {
+    pub fn execute(&mut self) -> Action {
         'main: loop {
             match self.step() {
-                Action::Halt => break 'main,
-                Action::Output(value) => self.output.push(value),
+                Action::Halt => return Action::Halt,
+
+                Action::Output(value) => {
+                    self.output.push(value);
+                    if self.halt_on_output {
+                        return Action::Output(value);
+                    }
+                },
+
                 Action::Nothing => (),
             }
         }

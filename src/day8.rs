@@ -69,7 +69,7 @@ fn solve_part_one(data: &[u32], width: usize, height: usize ) -> String {
 }
 
 fn solve_part_two(data: &[u32], width: usize, height: usize ) -> String {
-    let mut raw_layers: Vec<Layer> = data.chunks(width * height).map(|w| Layer::new(w)).collect();
+    let raw_layers: Vec<Layer> = data.chunks(width * height).map(|w| Layer::new(w)).collect();
     let mut layers = vec![];
     for layer in raw_layers.iter() {
         layers.push(layer.get_2d(width, height));

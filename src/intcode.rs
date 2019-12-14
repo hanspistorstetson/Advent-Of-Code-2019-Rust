@@ -48,7 +48,7 @@ pub struct Program {
     pub input: Vec<i64>,
     input_pointer: usize,
     halt_on_output: bool,
-    output: Vec<i64>
+    output: Vec<i64>,
 }
 
 impl Program {
@@ -212,13 +212,11 @@ impl Program {
             }
 
             Instruction::Halt => Action::Halt,
-
-            _ => unimplemented!(),
         };
     }
 
     pub fn execute(&mut self) -> Action {
-        'main: loop {
+        loop {
             match self.step() {
                 Action::Halt => return Action::Halt,
 
@@ -227,7 +225,7 @@ impl Program {
                     if self.halt_on_output {
                         return Action::Output(value);
                     }
-                },
+                }
 
                 Action::Nothing => (),
             }

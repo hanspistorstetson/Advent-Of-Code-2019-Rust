@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum Parameter {
     Position(usize),
+    Relative(i64),
     Immediate(i64),
 }
 
@@ -9,14 +10,16 @@ impl Parameter {
         match mode {
             0 => Parameter::Position(value as usize),
             1 => Parameter::Immediate(value),
+            2 => Parameter::Relative(value),
             _ => unimplemented!(),
         }
     }
 
-    pub fn get(&self, memory: &Vec<i64>) -> i64 {
+    pub fn get(&self, memory: &Vec<i64>, relative_base: i64) -> i64 {
         match self {
             Parameter::Immediate(value) => *value,
             Parameter::Position(position) => memory[*position],
+            Parameter::Relative(position) => memory[(position + relative_base) as usize],
         }
     }
 }
@@ -31,6 +34,7 @@ pub enum Instruction {
     JumpFalse(Parameter, Parameter),
     LessThan(Parameter, Parameter, Parameter),
     Equals(Parameter, Parameter, Parameter),
+    AdjustBase(Parameter),
     Halt,
 }
 
@@ -49,6 +53,7 @@ pub struct Program {
     input_pointer: usize,
     halt_on_output: bool,
     output: Vec<i64>,
+    relative_base: i64,
 }
 
 impl Program {
@@ -60,7 +65,12 @@ impl Program {
             input_pointer: 0,
             halt_on_output: false,
             output: vec![],
+            relative_base: 0,
         }
+    }
+
+    pub fn set_available_memory(&mut self, memory: usize) {
+        self.data.resize(memory, 0);
     }
 
     pub fn halt_on_output(&mut self) -> Self {
@@ -87,6 +97,7 @@ impl Program {
     pub fn write(&mut self, value: i64, output: &Parameter) {
         match output {
             Parameter::Position(position) => self.data[*position] = value,
+            Parameter::Relative(position) => self.data[(*position + self.relative_base) as usize] = value,
             _ => unimplemented!(),
         };
     }
@@ -141,19 +152,23 @@ impl Program {
                 Parameter::new(mode3, self.read()),
             ),
 
+            9 => Instruction::AdjustBase(Parameter::new(mode1, self.read())),
+
             99 => Instruction::Halt,
             _ => unimplemented!(),
         };
 
         return match instruction {
             Instruction::Add(lhs, rhs, output) => {
-                let value = lhs.get(&self.data) + rhs.get(&self.data);
+                let value = lhs.get(&self.data, self.relative_base)
+                    + rhs.get(&self.data, self.relative_base);
                 self.write(value, &output);
                 Action::Nothing
             }
 
             Instruction::Multiply(lhs, rhs, output) => {
-                let value = lhs.get(&self.data) * rhs.get(&self.data);
+                let value = lhs.get(&self.data, self.relative_base)
+                    * rhs.get(&self.data, self.relative_base);
                 self.write(value, &output);
                 Action::Nothing
             }
@@ -165,29 +180,29 @@ impl Program {
             }
 
             Instruction::Output(output) => {
-                let value = output.get(&self.data);
+                let value = output.get(&self.data, self.relative_base);
                 Action::Output(value)
             }
 
             Instruction::JumpTrue(param, output) => {
-                if param.get(&self.data) != 0 {
-                    self.jump(output.get(&self.data) as usize);
+                if param.get(&self.data, self.relative_base) != 0 {
+                    self.jump(output.get(&self.data, self.relative_base) as usize);
                 }
 
                 Action::Nothing
             }
 
             Instruction::JumpFalse(param, output) => {
-                if param.get(&self.data) == 0 {
-                    self.jump(output.get(&self.data) as usize);
+                if param.get(&self.data, self.relative_base) == 0 {
+                    self.jump(output.get(&self.data, self.relative_base) as usize);
                 }
 
                 Action::Nothing
             }
 
             Instruction::LessThan(lhs, rhs, output) => {
-                let lhs = lhs.get(&self.data);
-                let rhs = rhs.get(&self.data);
+                let lhs = lhs.get(&self.data, self.relative_base);
+                let rhs = rhs.get(&self.data, self.relative_base);
 
                 if lhs < rhs {
                     self.write(1, &output);
@@ -199,14 +214,20 @@ impl Program {
             }
 
             Instruction::Equals(lhs, rhs, output) => {
-                let lhs = lhs.get(&self.data);
-                let rhs = rhs.get(&self.data);
+                let lhs = lhs.get(&self.data, self.relative_base);
+                let rhs = rhs.get(&self.data, self.relative_base);
 
                 if lhs == rhs {
                     self.write(1, &output);
                 } else {
                     self.write(0, &output);
                 }
+
+                Action::Nothing
+            }
+
+            Instruction::AdjustBase(base) => {
+                self.relative_base += base.get(&self.data, self.relative_base);
 
                 Action::Nothing
             }
@@ -258,14 +279,21 @@ pub mod tests {
     pub fn test_parameter_immediate() {
         let param = Parameter::new(1, 100);
         let memory = vec![1, 2, 3];
-        assert_eq!(param.get(&memory), 100);
+        assert_eq!(param.get(&memory, 0), 100);
     }
 
     #[test]
     pub fn test_parameter_position() {
         let param = Parameter::new(0, 1);
         let memory = vec![1, 2, 3];
-        assert_eq!(param.get(&memory), 2);
+        assert_eq!(param.get(&memory, 0), 2);
+    }
+
+    #[test]
+    pub fn test_parameter_relative() {
+        let param = Parameter::new(2, 1);
+        let memory = vec![1, 2, 3, 4, 5];
+        assert_eq!(param.get(&memory, 0), 2);
     }
 
     #[test]
@@ -292,5 +320,14 @@ pub mod tests {
         let mut program = Program::new(data, input);
         program.execute();
         assert_eq!(program.data, vec![2, 3, 0, 6, 99])
+    }
+
+    #[test]
+    pub fn test_relative_base() {
+        let data = parse_input("1102,34915192,34915192,7,4,7,99,0");
+        let mut program = Program::new(data, vec![]);
+        program.execute();
+
+        assert_eq!(program.get_output()[0], 1_219_070_632_396_864);
     }
 }

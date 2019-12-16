@@ -38,7 +38,7 @@ pub enum Instruction {
     Halt,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Action {
     Nothing,
     Output(i64),
@@ -97,7 +97,9 @@ impl Program {
     pub fn write(&mut self, value: i64, output: &Parameter) {
         match output {
             Parameter::Position(position) => self.data[*position] = value,
-            Parameter::Relative(position) => self.data[(*position + self.relative_base) as usize] = value,
+            Parameter::Relative(position) => {
+                self.data[(*position + self.relative_base) as usize] = value
+            }
             _ => unimplemented!(),
         };
     }
